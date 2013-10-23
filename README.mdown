@@ -1,0 +1,3 @@
+COSN: Cloud-based Online Social Network
+
+Spec : [CPE 400/600 - Project Part 1](http://www.cse.unr.edu/~mgunes/cpe400/project1.htm)
