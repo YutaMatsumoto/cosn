@@ -5,11 +5,46 @@ import signal
 import sys
 from socket import *
 
-#
-# functions
-#
 
-# TODO : Thread ? 
+# ------------------------------------------------------------------------------
+# Program Conguration
+
+def signal_handler(signal, frame):
+	# release resources on sigint
+	print "SIGINT received"
+	sys.exit(0)
+	sock.close()
+signal.signal(signal.SIGINT, signal_handler)
+
+def parse_command(): 
+	sys.argv.pop(0)
+	for arg in sys.argv: 
+		if 0 < len( sys.argv ):
+			port = int( sys.argv[0] )
+			print "binding port: " + sys.argv[0]
+		else:
+			print "Usage : server.py portnumber "
+			sys.argv.pop(0)
+			sys.exit(1)
+	return port
+
+# udp server parameters
+def setup_udp_socket(port):
+	print "server listining on port : ", port
+	sock = socket(AF_INET, SOCK_DGRAM)
+	sock.bind(('', port))
+	return sock
+
+
+
+# ------------------------------------------------------------------------------
+# Server Functions
+
+def print_ctable():
+	# TODO pretty print
+	pprint.pprint(ctable)
+
+# TODO : Thread / select ? 
 def ping(uid,ip,port):
 	print "PINGing " + uid + " " + ip + " " + str(port)
 	message = "PING " + uid + " " + ip + " " + str(port)
@@ -29,37 +64,18 @@ def ping(uid,ip,port):
 	return success
 
 
-# release resources on sigint
-def signal_handler(signal, frame):
-	print "SIGINT received"
-	sys.exit(0)
-	sock.close()
-signal.signal(signal.SIGINT, signal_handler)
 
-# command line parameter
-sys.argv.pop(0)
-for arg in sys.argv: 
-	if 0 < len( sys.argv ):
-		port = int( sys.argv[0] )
-		print "binding port: " + sys.argv[0]
-	else:
-		print "Usage : server.py portnumber "
-		sys.argv.pop(0)
-		sys.exit(1)
+# ------------------------------------------------------------------------------
+# Main
 
-# udp server parameters
-print "server listining on port : ", port
-sock = socket(AF_INET, SOCK_DGRAM)
-sock.bind(('', port))
-bufsize=2048
-
-# client info variables
-ctable = {} 
-
+port = parse_command()
+sock_bufsize=2048
+sock = setup_udp_socket(port)
+ctable = {} # client info variables
 
 # Handle Client Request
 while 1:
-	message, caddr = sock.recvfrom(bufsize)
+	message, caddr = sock.recvfrom(sock_bufsize)
 	print "From Client of "+str(caddr)+ ": " + message
 	words = message.split()
 	if len(words)<1: 
@@ -73,12 +89,9 @@ while 1:
 		cmaddr=words[2] # client message address
 		cmport=words[3] # client message port
 		ctable[cmuid] = { "address":cmaddr, "port":cmport } # cmport is welcoming tcp socket of client
-		# Sending ACK
-		print "Sending ACK Message to Client Desitined To ", caddr, "From ", 
+		# send ACK
 		ackmsg = "ACK " + cmuid + " " + ctable[cmuid]["address"] + " " + ctable[cmuid]["port"]
-		# print "Client Address: ", caddr
 		sock.sendto(ackmsg,caddr) # This is not received by client
-		pprint.pprint(ctable)
 	elif words[0] == "QUERY": 
 		if len(words)<2:
 			print "Number of arguments for QUERY command is not enough"

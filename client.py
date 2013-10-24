@@ -1,12 +1,46 @@
 #!/usr/bin/env python
 
+#
+# Overview
+#
+# This program acts as a client program of COSN specified on
+# <http://www.cse.unr.edu/~mgunes/cpe400/project1.htm>. This client has
+# capability to access the central server to query the information regarding
+# the peers, and initiate communication with other peers, and serve other peers. 
+#
+# This file consists of Client class and some code to create one client and
+# run that client. Each message defined in the specification earns a method in
+# the client and named likewise (Ex. QUERY message is named udp_query() ).
+#
+
+#
+# Usage 
+#
+# The usage will be given by a help option on the program. Invoke the program
+# with -h or --help.
+
+#
+# Variable Name Convension
+#
+#	ps : peer server     : server that serves requests of the peers. I.e., this client.
+#	cs : central server  : server that handles udp requests of clients.
+#
+
+# Client Method Name Convension
+#
+#	"udp" is used as a prefix for methods that send  requests to the central server
+#	"peer" is used as a preifx for methods that send requests to peer servers.
+#
+
 import signal
 import sys
 from socket import *
 
+# ------------------------------------------------------------------------------
+# Util
 
-# From [get open TCP port in Python - Stack Overflow](http://stackoverflow.com/questions/2838244/get-open-tcp-port-in-python)
 def get_open_port():
+	# From [get open TCP port in Python - Stack Overflow](http://stackoverflow.com/questions/2838244/get-open-tcp-port-in-python)
 	import socket
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	s.bind(("",0))
@@ -17,62 +51,77 @@ def get_open_port():
 
 def parse_command():
 	if 3 > len( sys.argv ):
-		print "usage : client.py user-id server-ip server-port"
+		print "usage : client.py user-id server-ip [server-port]"
 		print "argv: ", sys.argv
 		sys.exit(1)
 	sys.argv.pop(0); 
 	uid   = sys.argv[0] ; sys.argv.pop(0)
-	sip = sys.argv[0] ; sys.argv.pop(0)
-	sport = int( sys.argv[0] )
-	saddr = (sip, sport)
-	return uid, saddr
+	cs_ip = sys.argv[0] ; sys.argv.pop(0)
+	cs_port = int( sys.argv[0] )
+	print "uid, server ip, server port = ", uid, cs_ip, cs_port
+	return uid, cs_ip, cs_port
 
+
+# ------------------------------------------------------------------------------
+# ChatScreen TODO
+class ChatScreen: 
+	def __init__(self):
+		1
+	def show_chat_message(self, message): 
+		print "ChatScreen: ", message
+
+# ------------------------------------------------------------------------------
+# Client
 
 class Client: 
 
-	uid = -1                             # username
-	saddr = ()                           # address (ip,port) to register on the server
-	pssock = socket(AF_INET,SOCK_STREAM) # tcp socket to serve peers
-	psport = -1                          # port pssock binds to
-	csock = socket(AF_INET, SOCK_DGRAM)  # udp socket to connect to server
+	debug = True
 
-	def __init__(self, uid, saddr): 
+	# About This Client, which servs as a peer server (ps) as well.
+	uid = -1 # user ID of this client, registered on the central server
+	chatting = False
+	chat_screen = ChatScreen()
+
+	# Peer Connection Variables
+	chat_counter = 0
+
+	# Peer Server Variales
+	ps_sock = socket(AF_INET,SOCK_STREAM) # TCP welcoming socket to serve peers
+	ps_port = -1                          # port number the TCP socket above binds to 
+
+	# Central Server Variables
+	cs_ip = -1   # IP address of central server
+	cs_port = -1 # port number of central server for UDP requests
+	cs_sock = socket(AF_INET, SOCK_DGRAM) # udp socket to connect to server
+
+
+	def __init__(self, uid, cs_ip, cs_port): 
+		self.chat_screen = ChatScreen()
 		self.uid = uid
-		self.saddr = saddr
-		self.setup_peer_server()
+		self.cs_ip, self.cs_port = cs_ip, cs_port
+		self.ps_port = get_open_port()
+		self.ps_sock.bind(('',self.ps_port))
+		self.ps_sock.listen(1)
+		self.udp_register()
+
+	def terminate(self): 
+			self.ps_sock.close()	
+			self.cs_sock.close()
 
 	def __del__(self):
-		self.pssock.close()	
-		self.csock.close()
-		# pssock.shutdown(SHUT_WR) # TODO
-	def setup_peer_server(self):
-		# Establish Peer Server (ps) for Peer Client (pc)
-		# TODO need to pick open port
-		# TODO this blocks at accept()
-		self.psport = get_open_port()
-		# pssock =  socket(AF_INET,SOCK_STREAM)
-		self.pssock.bind(('',self.psport))
-		self.pssock.listen(1)
-		# see p108 of Ch2 ppt
-		# pconn, paddr = pssock.accept() # connection socket with new peer
-		# sentence = pconn.recv(1024)
-		# pconn.close()
-		# pssock.close()
-		return self.pssock, self.psport
+		# TODO : should be shutdown(SHUT_WR) ? close() does not collect resources immediately ?
+		self.terminate()
 
-	def udp_register(self,uid,ip):
-		# TODO arg not needed since they are member variables
+	def udp_register(self):
 		trycount = 0
 		while trycount < 3:
-			# TODO use _send_to_central_server()
 			header = "REGISTER " 
-			body = uid + " " + ip + " " + str(self.psport)
-			message = header + body
-			self.csock.sendto(message,saddr)
-			# TODO confirm ACK body match up with local uid,address,port
-			self.csock.settimeout(1)  # timeout for ACK receipt is 10 sec TODO timeout is set to 1 when devloping
+			body = self.uid + " " + self.cs_ip + " " + str(self.ps_port)
+			self._send_to_central_server( header + body )
+			self.cs_sock.settimeout(1)  # timeout for ACK receipt is 10 sec TODO timeout is set to 1 when devloping
 			try: 
-				smsg,aaaa = self.csock.recvfrom(2048) # Receive ACK
+				ack_msg,address = self._receive_from_central_server()  # Receive ACK
+				# TODO confirm ACK body matches up with local uid,address,port
 			except timeout:
 				trycount+=1
 				continue
@@ -80,64 +129,119 @@ class Client:
 
 	def udp_query(self, uid): 
 		self._send_to_central_server("QUERY "+uid)
-		self.csock.settimeout(1)
-		# TODO parses message and return
+		self.cs_sock.settimeout(1)
+		# TODO parse message and return it
 		try: 
-			smsg,aaaa = self.csock.recvfrom(2048) # Receive LOCATION
-			print smsg
-			return smsg
+			location, address = self._receive_from_central_server() # Receive LOCATION
+			return location
 		except timeout:
-			print "TIMEOUT on QUERY"
+			print "Timeout on QUERY-ing ", uid
 
 	def udp_quit(self):
-		ip = self.saddr[0]
-		port = str(self.saddr[1])
+		ip = self.cs_ip
+		port = str(self.cs_port)
 		self._send_to_central_server("QUIT " + self.uid + " " + ip + " " + port )
 
 	def udp_down(self, uid, ip, port):
 		self._send_to_central_server( "DOWN " + uid + " " + ip + " " + port )
 
+	# -----------------------------------------------------------------------
+
 	def tcp_pong(self,sock):
 		# Note: gethostname() doesn't always return the fully qualified domain name; use getfqdn() (see above).
-		# TODO choose csock or pssock or something else
+		# TODO choose cs_sock or ps_sock or something else
 		hostname = gethostbyname(gethostname())
-		sock.send("PONG " + self.uid + " " + hostname + " " + str(self.psport) )
+		sock.send("PONG " + self.uid + " " + hostname + " " + str(self.ps_port) )
 
+	# ------------------------------------------------------------------------
+
+	def cs_address(self): 
+		return (self.cs_ip, self.cs_port)
+
+	# ------------------------------------------------------------------------
 	def _send_to_central_server(self, message):
-		self.csock.sendto(message, saddr)
+		if self.debug: 
+			print "To   Central Server: ", message
+		self.cs_sock.sendto( message, self.cs_address() )
 
-	def start_chat(self,peer_ip):
-		print "impl start_chat()"
-		1
+	def _receive_from_central_server(self):
+		# TODO buffer size
+		(message, address) = self.cs_sock.recvfrom(2048)
+		if (self.debug):
+			print "From Central Server: ", message
+		return message, address
 
-	def process_tcp_request(self):
-		# self.csock.settimeout(2)
-		# try: 
-		# 	message,address=self.csock.recvfrom(2048)
-		# 	words = message.split()
-		# 	print "WORDS: ", words
-		# except timeout:
-		# 	print "csock timeout in process_tcp_request()"
-		# 	1
-		sock,addr = self.pssock.accept()
-		sock.settimeout(3) # TODO adjust TIMEOUT
+
+	# ------------------------------------------------------------------------
+	# As Peer Server 
+	
+	def serve_tcp_request(self):
 		try: 
-			message   = sock.recv(2048)
+			sock,addr = self.ps_sock.accept()
+			sock.settimeout(3) # TODO adjust TIMEOUT
+			message   = sock.recv(1024)
 			words     = message.split()
-			print "Received ", message
+
+			if self.debug: 
+				print "Received ", message
+
 			if words[0] == "PING": 
 				# TODO check PING parameters
 				self.tcp_pong(sock)
 			elif words[0] == "FRIEND":
 				# TODO separate CONFIRM as a function like tcp_pong
 				peer_uid = words[1]
-				sock.send( "CONFIRM " + self.uid )
-				self.start_chat( peer_ip )
-
+				if self.chatting == False:
+					self.chatting = True
+					sock.send( "CONFIRM " + self.uid )
+				else:
+					sock.send( "BUSY " + self.uid )
+			elif words[0] == "CHAT": 
+				if self.chatting == True:
+					# TODO size limitation on message
+					# chat = sock.recv(1024)
+					counter = words[1]
+					message = words[2]
+					self.chat_screen.show_chat_message(message)
+				else: 
+					if self.debug:
+						print "Ignoring CHAT message since FRIEND message has not been received."
+			else: 
+				print "Received insensible message: ", message
 			sock.close()
+
 		except timeout:
-			print "pssock timeout in process_tcp_request()"
-			1
+			print "Timeout in serve_tcp_request()"
+
+	# ------------------------------------------------------------------------
+	# As Peer
+	
+	def _receive_from_peer(self, sock): 
+		message = sock.recv(1024)
+		if self.debug:
+			print "From Peer: ", message
+		return message 
+
+	def _send_to_peer(self, sock, message):
+		if self.debug:
+			print "To   Peer: ", message
+		sock.send(message)
+
+	# def _peer_init_connection(self, ip, port, timeout):
+	# 	if self.p_conn_sock_inited == False:
+	# 		self.p_conn_sock = socket(AF_INET, SOCK_STREAM)
+	# 		self.p_conn_sock.settimeout(timeout)
+	# 		self.p_conn_sock.connect((ip,int(port)))
+	# 		# TODO: Make sure it is inited according to ip and port
+	# 		self.p_conn_sock_inited = True 
+
+	def init_tcp_conn(self,ip,port): 
+		# TODO ip and port should be replaced by uid and the connection information should be cached
+		sock = socket(AF_INET, SOCK_STREAM)
+		sock.settimeout(2)           
+		sock.connect((ip,int(port)))       
+		return sock
+		
 
 	def peer_friend(self, peer_id):
 		location = self.udp_query( peer_id )
@@ -147,34 +251,56 @@ class Client:
 			return False
 		else: 
 			message = "FRIEND " + uid
-			sock = socket(AF_INET, SOCK_STREAM)
-			sock.settimeout(1) # TODO increase TIMEOUT
 			try: 
-				print "ip and port of the peer: ", ip,port
-				sock.connect((ip,port)) # TODO TODO TODO TODO TODO TODO
-				sock.send(message)
-				print "after sock.send(message) in peer_friend"
-				confirmation = sock.recv(1024)
+				sock = self.init_tcp_conn(ip,port)
+				self._send_to_peer(sock, message)
 				# TODO : check confirmation content
-			except:
+				confirmation = self._receive_from_peer(sock)
+			except timeout:
+				print self.uid, "failed friend request"
 				self.udp_down(uid,ip,port)
 		
+	def peer_chat(self, peer, message):
+		# TODO : end-of-line => separate chat message
+		# TODO : Show message sent on chat screen
+		location = self.udp_query( "saori" ) # TODO saori to saved peer
+		words = location.split()
+		ip = words[1]
+		port = words[2]
+		sock = self.init_tcp_conn(ip,port)
+		self.chat_screen.show_chat_message(message)
+		self.chat_counter += 1
+		self._send_to_peer(sock, "CHAT "+ str(self.chat_counter) + " " + message)
 
 
-# if __name__ = "__main__":
-uid, saddr = parse_command()
-u = Client(uid,saddr)
-u.udp_register(uid, "127.0.0.1")
-if u.uid == "saori":
-	1	
-elif u.uid == "ymat" or u.uid == "yuta":
-	u.peer_friend("saori")
-else:
-	print "uid not yuta/ymat nor soari"
+# ------------------------------------------------------------------------------
+# Tests : UDP requests
+#
 # u.udp_query(uid)
 # u.udp_quit()
 # u.udp_query(uid)
-# u.udp_down(uid, "127.0.0.1", str(u.psport) )
+# u.udp_down(uid, "127.0.0.1", str(u.ps_port) )
 # u.peer_friend("saori")
-while 1: 
-	u.process_tcp_request()
+#
+
+# ------------------------------------------------------------------------------
+# Main
+
+def signal_handler(signal, frame):
+	print "SIGINT received"
+	client.terminate()
+	sys.exit(1)
+signal.signal(signal.SIGINT, signal_handler)
+
+# if __name__ = "__main__":
+uid, cs_ip, cs_port = parse_command()
+u = Client(uid,cs_ip,cs_port)
+# u.udp_register(uid, "127.0.0.1")
+if u.uid == "saori":
+	while 1: 
+		u.serve_tcp_request()
+elif u.uid == "ymat" or u.uid == "yuta":
+	u.peer_friend("saori")
+	u.peer_chat("saori", "Waaatup!!!")	
+else:
+	print "uid not yuta/ymat nor soari"
