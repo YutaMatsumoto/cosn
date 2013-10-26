@@ -203,6 +203,8 @@ class Client:
 					counter = words[1]
 					message = words[2]
 					self.chat_screen.show_chat_message(message)
+					# TODO separete delivered
+					self._send_to_peer(sock, "DELIVERED " + str(counter) )
 				else: 
 					if self.debug:
 						print "Ignoring CHAT message since FRIEND message has not been received."
@@ -263,7 +265,7 @@ class Client:
 	def peer_chat(self, peer, message):
 		# TODO : end-of-line => separate chat message
 		# TODO : Show message sent on chat screen
-		location = self.udp_query( "saori" ) # TODO saori to saved peer
+		location = self.udp_query( peer ) # TODO saori to saved peer
 		words = location.split()
 		ip = words[1]
 		port = words[2]
@@ -271,6 +273,25 @@ class Client:
 		self.chat_screen.show_chat_message(message)
 		self.chat_counter += 1
 		self._send_to_peer(sock, "CHAT "+ str(self.chat_counter) + " " + message)
+		self._receive_from_peer(sock)
+			
+	def address_of_peer(self, peer):
+		location = self.udp_query( peer ) # TODO saori to saved peer
+		words = location.split()
+		ip = words[1]
+		port = words[2]
+		return ip,port
+
+	def peer_request(self, peer, profile_version):
+		ip,port = self.address_of_peer(peer)
+		sock = self.init_tcp_conn(ip,port)
+		self._send_to_peer(sock, "REQUEST " + str(profile_version) )
+
+
+
+
+		
+
 
 
 # ------------------------------------------------------------------------------
@@ -302,5 +323,6 @@ if u.uid == "saori":
 elif u.uid == "ymat" or u.uid == "yuta":
 	u.peer_friend("saori")
 	u.peer_chat("saori", "Waaatup!!!")	
+	u.peer_request("saori", 1)
 else:
 	print "uid not yuta/ymat nor soari"
