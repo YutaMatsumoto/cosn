@@ -18,6 +18,7 @@
 #
 # The usage will be given by a help option on the program. Invoke the program
 # with -h or --help.
+#
 
 #
 # Variable Name Convension
@@ -32,15 +33,22 @@
 #	"peer" is used as a preifx for methods that send requests to peer servers.
 #
 
+	
+from chatscreen import *
+from functools import wraps
 from profile import *
+from socket import *
 import errno
 import os
 import signal
 import sys
-from socket import *
+import threading
+import time
+
 
 # ------------------------------------------------------------------------------
 # Util
+
 def get_open_port():
 	# From [get open TCP port in Python - Stack Overflow](http://stackoverflow.com/questions/2838244/get-open-tcp-port-in-python)
 	import socket
@@ -63,13 +71,6 @@ def parse_command():
 	print "uid, server ip, server port = ", uid, cs_ip, cs_port
 	return uid, cs_ip, cs_port
 
-# ------------------------------------------------------------------------------
-# ChatScreen TODO
-class ChatScreen: 
-	def __init__(self):
-		1
-	def show_chat_message(self, message): 
-		print "ChatScreen: ", message
 
 # ------------------------------------------------------------------------------
 # Client
@@ -177,15 +178,23 @@ class Client:
 	# ------------------------------------------------------------------------
 	# As Peer Server 
 	
+	def server_receive(self,sock):
+		message = sock.recv(1024) # TODO buffer size
+		if self.debug:
+			print "Received ", message
+		return message
+
+	def server_send(self,sock,message):
+		sock.send(message)
+		
+	
 	def serve_tcp_request(self):
 		try: 
 			sock,addr = self.ps_sock.accept()
 			sock.settimeout(3) # TODO adjust TIMEOUT
-			message   = sock.recv(1024)
+			message   = self.server_receive(sock)
 			words     = message.split()
 
-			if self.debug: 
-				print "Received ", message
 
 			if words[0] == "PING": 
 				# TODO check PING parameters
@@ -213,7 +222,9 @@ class Client:
 			elif words[0] == "REQUEST": 
 				version = words[1]
 				self.peer_profile(version, sock)
-			elif words[0] == "RELAY": # TODO
+			elif words[0] == "RELAY": 
+				# TODO PHASE2 : check if this client has any information about the uid on the RELAY message
+				# and return 
 				uid = words[1]
 				version = words[2]
 				self.peer_profile(version, sock)
@@ -296,7 +307,7 @@ class Client:
 
 		# receive profile update and store it
 		update = self._receive_from_peer(sock)
-		xml = " ".join( update.split()[ 3: ] )
+		xml = " ".join( update.split()[ 3: ] ) # TODO this changes indentation
 		self.peer_profile = ET.fromstring( xml )
 
 		# parse for posted files that are in <items> tags
@@ -307,7 +318,7 @@ class Client:
 			if item is not None:
 				self.posted_files.append(item.text)
 
-		# TODO on phase2
+		# TODO on PHASE2
 		# update local peer profile on hard disk
 		# peer_profile_file = peer+"-profile.xml" 
 		# profile = Profile(peer_profile_file)
@@ -316,9 +327,12 @@ class Client:
 		# print "TODO in peer_request : flush"
 		# profile.flush()
 
+	def peer_relay(self,peer,profile_version):
+		ip,port = self.address_of_peer(peer)
+		sock = self.init_tcp_conn(ip,port)
+		self._send_to_peer(sock, "RELAY " + peer + " " + str(profile_version) )
+
 	def peer_profile(self, version_in_request, sock): 
-		# note file_length is sent as an ascii string
-		# TODO indicate current version
 		# Create xml file that consists of all the profiles since the version_in_request
 		current_profile_version  = self.profile.current_version_number()
 		profile_update = self.profile.versions_between(int(version_in_request)+1, current_profile_version ).tostring()
@@ -365,16 +379,47 @@ class Client:
 		print "well, our program terminates connection for every message..."
 
 
-
 # ------------------------------------------------------------------------------
-# Tests : UDP requests
-#
-# u.udp_query(uid)
-# u.udp_quit()
-# u.udp_query(uid)
-# u.udp_down(uid, "127.0.0.1", str(u.ps_port) )
-# u.peer_friend("saori")
-#
+# Test
+
+def udp_tests(): 
+	# parse_command consumes ?
+	uid, cs_ip, cs_port = parse_command()
+	u = Client(uid,cs_ip,cs_port)
+	# ------------------------------------------------------------------------------
+	# Tests : UDP requests
+	#
+	u.udp_query(uid)
+	u.udp_quit()
+	u.udp_query(uid)
+	u.udp_down(uid, "127.0.0.1", str(u.ps_port) )
+	if uid != "saori":
+		u.peer_friend("saori")
+
+def tcp_tests():
+	# parse_command consumes ?
+	uid, cs_ip, cs_port = parse_command()
+	u = Client(uid,cs_ip,cs_port)
+	# ------------------------------------------------------------------------------
+	# Tests : TCP requests
+	#
+	#	saori is server
+	#	ymat is client
+	#
+	# u.udp_register(uid, "127.0.0.1")
+	if u.uid == "saori":
+		while 1: 
+			u.serve_tcp_request()
+	elif u.uid == "ymat" or u.uid == "yuta":
+		u.peer_friend("saori")
+		u.peer_chat("saori", "Waaatup!!!")	
+		u.peer_request("saori", 2)
+		u.peer_get("saori", "profile.xml")
+		u.peer_terminate()
+		# u.peer_relay("saori", 1)
+	else:
+		print "uid not yuta/ymat nor soari"
+
 
 # ------------------------------------------------------------------------------
 # Main
@@ -382,26 +427,19 @@ class Client:
 # profile = Profile( "profile.xml" )
 # print profile.tostring()
 
+# Establish SIGINT handler for C-C quitting on terminal
 def signal_handler(signal, frame):
 	print "SIGINT received"
 	client.terminate()
 	sys.exit(1)
 signal.signal(signal.SIGINT, signal_handler)
 
-# if __name__ = "__main__":
-uid, cs_ip, cs_port = parse_command()
-u = Client(uid,cs_ip,cs_port)
+if __name__ == "__main__":
 
-# u.udp_register(uid, "127.0.0.1")
-if u.uid == "saori":
-	while 1: 
-		u.serve_tcp_request()
-elif u.uid == "ymat" or u.uid == "yuta":
-	u.peer_friend("saori")
-	u.peer_chat("saori", "Waaatup!!!")	
-	u.peer_request("saori", 2)
-	u.peer_get("saori", "profile.xml")
-	# u.peer_request("saori", 2)
-	u.peer_terminate()
-else:
-	print "uid not yuta/ymat nor soari"
+	# parse information for central server(cs) information on command line
+	uid, cs_ip, cs_port = parse_command()
+	u = Client(uid,cs_ip,cs_port)
+
+	# [Python Programming/Threading - Wikibooks, open books for an open world](http://en.wikibooks.org/wiki/Python_Programming/Threading)
+	# clientclient = 
+	# clientserver =
