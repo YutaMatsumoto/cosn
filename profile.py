@@ -14,10 +14,10 @@ class Profile:
 	def __init__(self, profile):
 		# TODO IOError
 		if profile is not None:
-			# If peer profile exists, just load it as Element
+			# Case : If peer profile exists, just load it as Element
 			if os.path.exists( profile ):
 				self.profiles = ET.parse(profile).getroot()
-			# If peer profile does not exist, create it on the spot with empty content.
+			# Case : If peer profile does not exist, create it on the spot with empty content.
 			else:
 				self.profiles = ET.Element("profile")
 				self.tostring()	
@@ -28,7 +28,13 @@ class Profile:
 			self.profiles = None
 
 	def __del__(self):
-		print "Profile __del__: implement flushing logic to profile." 
+		1
+		# print "Profile __del__: implement flushing logic to profile." 
+	
+	@staticmethod
+	def fromstring(xmlprofilestr):
+		# Case : profile is string
+		return ET.fromstring(xmlprofilestr)
 
 	# TODO on phase2
 	# def extend(self, xmlstring ):
@@ -77,3 +83,5 @@ if __name__ == "__main__":
 	p = Profile("profile.xml")
 	print "Current Version is " + str(p.current_version_number())
 	print p.versions_between(1,3).tostring()
+	p = Profile.fromstring("<profile></profile>")
+	print p.tostring()

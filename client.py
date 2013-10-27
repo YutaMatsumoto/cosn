@@ -85,6 +85,8 @@ class Client:
 
 	# Peer Connection Variables
 	chat_counter = 0
+	peer_profile = None # Element
+	posted_files = []
 
 	# Peer Server Variales
 	ps_sock = socket(AF_INET,SOCK_STREAM) # TCP welcoming socket to serve peers
@@ -215,6 +217,9 @@ class Client:
 				uid = words[1]
 				version = words[2]
 				self.peer_profile(version, sock)
+			elif words[0] == "GET":
+				filename = words[1]
+				self.peer_file(filename, sock)
 			else:
 				print "Received insensible message: ", message
 			sock.close() # TODO do not close until terminate message
@@ -226,7 +231,7 @@ class Client:
 	# As Peer
 	
 	def _receive_from_peer(self, sock): 
-		message = sock.recv(1024)
+		message = sock.recv(1024*1024)
 		if self.debug:
 			print "From Peer: ", message
 		return message 
@@ -281,14 +286,26 @@ class Client:
 		self._receive_from_peer(sock)
 
 	def peer_request(self, peer, profile_version):
+		# This functio
+		#	send REQUEST message, get profile updates for that, and parse posted files in <item> tags
 
 		# Send REQUEST message
 		ip,port = self.address_of_peer(peer)
 		sock = self.init_tcp_conn(ip,port)
 		self._send_to_peer(sock, "REQUEST " + str(profile_version) )
 
-		# receive profile update for new versions
+		# receive profile update and store it
 		update = self._receive_from_peer(sock)
+		xml = " ".join( update.split()[ 3: ] )
+		self.peer_profile = ET.fromstring( xml )
+
+		# parse for posted files that are in <items> tags
+		posted_items = []
+		print list(self.peer_profile)
+		for ver in self.peer_profile.findall("version"): 
+			item = ver.find("item")
+			if item is not None:
+				self.posted_files.append(item.text)
 
 		# TODO on phase2
 		# update local peer profile on hard disk
@@ -298,7 +315,6 @@ class Client:
 		# print "peer_request after extend ", profile.tostring()
 		# print "TODO in peer_request : flush"
 		# profile.flush()
-
 
 	def peer_profile(self, version_in_request, sock): 
 		# note file_length is sent as an ascii string
@@ -310,7 +326,44 @@ class Client:
 		message = self.uid + " " + str(current_profile_version) + " " +  str(profile_update_length) + " " + profile_update
 
 		self._send_to_peer( sock, message )
-		
+
+	def peer_get(self, peer, filename):
+		# TODO if file already exists locally outside of this function
+		if self.posted_files is None: 
+			print "No post files have been obtained yet."
+		else:
+			location = self.udp_query(peer)
+			ip = location.split()[1]
+			port = location.split()[2]
+			sock = self.init_tcp_conn(ip,port)
+			message = "GET " + filename
+			self._send_to_peer(sock, message)
+			# Wait for server to send the file
+			# TODO : assure all the data is received
+			reply = self._receive_from_peer(sock)
+			file = open("from_"+peer+"_"+filename, 'wr')
+			# throw away first three words
+			reply = reply.partition(' ')[2]
+			reply = reply.partition(' ')[2]
+			reply = reply.partition(' ')[2]
+			file.write(reply)
+			file.close()
+			# print file.read()
+
+	def peer_file(self, filename, sock):
+		fileexists = os.path.exists(filename)
+		if fileexists:
+			f = open(filename, 'r')	
+			filestr = f.read()
+			filesize= len(filestr)
+			message = "FILE " + filename + " " + str(filesize) + " " + filestr
+		else:
+			message = "FILE " + filename + " " + str(0)
+		self._send_to_peer(sock, message)
+
+	def peer_terminate(self):
+		print "well, our program terminates connection for every message..."
+
 
 
 # ------------------------------------------------------------------------------
@@ -347,6 +400,8 @@ elif u.uid == "ymat" or u.uid == "yuta":
 	u.peer_friend("saori")
 	u.peer_chat("saori", "Waaatup!!!")	
 	u.peer_request("saori", 2)
+	u.peer_get("saori", "profile.xml")
 	# u.peer_request("saori", 2)
+	u.peer_terminate()
 else:
 	print "uid not yuta/ymat nor soari"

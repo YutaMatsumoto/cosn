@@ -4,6 +4,7 @@ import pprint
 import signal
 import sys
 from socket import *
+import xml.etree.ElementTree as ET
 
 
 # ------------------------------------------------------------------------------
