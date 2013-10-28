@@ -112,7 +112,7 @@ while 1:
 			port = "0"
 		sock.sendto( "LOCATION " + address + " " + port, caddr)
 	elif words[0] == "QUIT":
-		if len(words) < 3
+		if len(words) < 3:
 			errlog = "Number of arguments for QUIT is not enough: " + ( " ".join(words) )
 			ErrorLog.Instance.log(errlog)
 			continue
@@ -125,7 +125,7 @@ while 1:
 		else:
 			ctable.pop(uid_in_message)
 	elif words[0] == "DOWN":
-		if len(words) < 4
+		if len(words) < 4:
 			errlog = "Number of arguments for DOWN is not enough: " + ( " ".join(words) )
 			ErrorLog.Instance.log(errlog)
 			continue

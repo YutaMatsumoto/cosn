@@ -554,6 +554,10 @@ if __name__ == "__main__":
 	client_client.start()
 	client_server.start()
 
+	while True: 
+		time.sleep(1000000)
+
+
 	# TODO thread join	
 	# client_client.join()	
 	# client_server.join()
