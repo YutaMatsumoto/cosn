@@ -135,9 +135,9 @@ class Client(threading.Thread):
 
 	def tcp_pong(self,sock):
 		# Note: gethostname() doesn't always return the fully qualified domain name; use getfqdn() (see above).
-		# TODO choose cs_sock or ps_sock or something else
 		hostname = gethostbyname(gethostname())
-		sock.send("PONG " + self.uid + " " + hostname + " " + str(self.ps_port) )
+		self._send_to_central_server( "PONG " + self.uid + " " + hostname + " " + str(self.ps_port) ) 
+		# sock.send("PONG " + self.uid + " " + hostname + " " + str(self.ps_port) )
 
 	# ------------------------------------------------------------------------
 
@@ -149,7 +149,7 @@ class Client(threading.Thread):
 	def _send_to_central_server(self, message):
 		if self.debug: 
 			print "To   Central Server: ", message
-		self.cs_sock.sendto( message, self.cs_address() )
+		self.cs_sock.sendto( message + "\n" , self.cs_address() )
 
 	def _receive_from_central_server(self):
 		# TODO buffer size
@@ -167,9 +167,6 @@ class Client(threading.Thread):
 			print "Received ", message
 		return message
 
-	def server_send(self,sock,message):
-		sock.send(message)
-		
 	def serve_tcp_request(self):
 		try: 
 			sock,addr = self.ps_sock.accept()
@@ -185,7 +182,7 @@ class Client(threading.Thread):
 				peer_uid = words[1]
 				if self.chatting == False:
 					self.chatting = True
-					sock.send( "CONFIRM " + self.uid )
+					self._send_to_peer(sock, "CONFIRM " + self.uid )
 				else:
 					sock.send( "BUSY " + self.uid )
 			elif words[0] == "CHAT": 
@@ -222,8 +219,19 @@ class Client(threading.Thread):
 	# ------------------------------------------------------------------------
 	# As Peer Client
 	
-	def _receive_from_peer(self, sock): 
-		message = sock.recv(1024*1024)
+	def _receive_from_peer(self, sock, stop="AtLineFeed"):
+		message = ""
+		char = ""
+		if stop == "AtLineFeed":
+			while True:
+				char = sock.recv(1)
+				if char == "\n": 
+					break
+				else:
+					message += char
+		elif stop == "1MB":
+			message = sock.recv(1024*1024)
+
 		if self.debug:
 			print "From Peer: ", message
 		return message 
@@ -231,7 +239,7 @@ class Client(threading.Thread):
 	def _send_to_peer(self, sock, message):
 		if self.debug:
 			print "To   Peer: ", message
-		sock.send(message)
+		sock.send(message + "\n")
 
 	def init_tcp_conn(self,ip,port): 
 		# TODO ip and port should be replaced by uid and the connection information should be cached
@@ -289,13 +297,13 @@ class Client(threading.Thread):
 		self._send_to_peer(sock, "REQUEST " + str(profile_version) )
 
 		# receive profile update and store it
-		update = self._receive_from_peer(sock)
+		update = self._receive_from_peer(sock, "1MB" )
 		xml = " ".join( update.split()[ 3: ] ) # TODO this changes indentation
 		self.peer_profile = ET.fromstring( xml )
 
 		# parse for posted files that are in <items> tags
 		posted_items = []
-		print list(self.peer_profile)
+		# print list(self.peer_profile)
 		for ver in self.peer_profile.findall("version"): 
 			item = ver.find("item")
 			if item is not None:
@@ -331,16 +339,18 @@ class Client(threading.Thread):
 		if self.posted_files is None: 
 			print "No post files have been obtained yet."
 		else:
+			# Send Request
 			location = self.udp_query(peer)
 			ip = location.split()[1]
 			port = location.split()[2]
 			sock = self.init_tcp_conn(ip,port)
 			message = "GET " + filename
 			self._send_to_peer(sock, message)
-			# Wait for server to send the file
-			# TODO : assure all the data is received
-			reply = self._receive_from_peer(sock)
+
+			# Receive File
+			reply = self._receive_from_peer(sock, "1MB")
 			file = open("from_"+peer+"_"+os.path.basename(filename), 'wr')
+
 			# throw away first three words
 			reply = reply.partition(' ')[2]
 			reply = reply.partition(' ')[2]
