@@ -204,7 +204,7 @@ class Client(threading.Thread):
 					# TODO size limitation on message
 					# chat = sock.recv(1024)
 					counter = words[1]
-					message = words[2]
+					message = " ".join( words[2: ] ) # TODO HACK
 					self.chat_screen.show_chat_message(message)
 					# TODO separete delivered
 					self._send_to_peer(sock, "DELIVERED " + str(counter) )
@@ -276,7 +276,8 @@ class Client(threading.Thread):
 
 	def peer_friend(self, peer_id):
 		location = self.udp_query( peer_id )
-		uid,ip,port= location.split()
+		# uid,ip,port= location.split()
+		a,ip,port= location.split()
 		if ip == "0.0.0.0" and port == 0: 
 			print "The user does not exit."
 			return False
@@ -301,7 +302,7 @@ class Client(threading.Thread):
 		ip = words[1]
 		port = words[2]
 		sock = self.init_tcp_conn(ip,port)
-		self.chat_screen.show_chat_message(message)
+		# self.chat_screen.show_chat_message(message)
 		self.chat_counter += 1
 		self._send_to_peer(sock, "CHAT "+ str(self.chat_counter) + " " + message)
 		return self._receive_from_peer(sock)
@@ -440,7 +441,7 @@ class Client(threading.Thread):
 							while True:	
 								message = raw_input("Enter Message to Send > ")
 								reply = self.peer_chat(peer_uid, message)
-								print reply
+								# print reply
 						elif reply == "BUSY":
 							print peer_uid + " is busy."
 							# print reply_peer + " is busy."

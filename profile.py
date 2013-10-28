@@ -1,7 +1,16 @@
 #!/usr/bin/env python
 
+# Overview
+#
+# This file contains a class called Profile, which handles parsing xml
+# profiles in files and constructing profiles from xml strings.
+#
+
+# References
+#
 # [19.7. xml.etree.ElementTree - The ElementTree XML API - Python v2.7.5 documentation] 
 #   http://docs.python.org/2/library/xml.etree.elementtree.html#reference
+#
 
 import os
 import xml.etree.ElementTree as ET

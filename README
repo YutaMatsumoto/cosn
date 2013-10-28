@@ -1,0 +1,71 @@
+COSN: Cloud-based Online Social Network : Phase 1
+
+Members 
+
+	Bryam Noguera
+	Yuta Matsumoto
+
+
+Files
+
+	chatscreen.py   … To be chat screen class but not used much in this phase
+	client.py       … This contains class called Client to serve other peers and to make request to other peers.
+	common.py       … This file contains code used by both server and client.
+	cosn_log.py     … Logger classes for errors and activities.
+	profile.py      … Profile class parses xml profiles in file and constructs profiles from xml strings.
+	README          … This file
+	server.py       … Code for central server clients make UDP requests to.
+	timeouterror.py … For timeout.
+
+
+What Doesn'T Work / Possible Problems
+
+	Code worked when both server and clients were invoked on 127.0.0.1, but
+	not over network. This could be because of the local network we were
+	working on.  We get this error "error: [Errno 111] Connection refused".
+
+	We check errors on just the number of arguments on the message, not
+	anything more.
+
+	We used terminal instead of GUI, so if the client program receives some
+	message from other peers when it is showing a promt to the user, the
+	prompt becomes mixed up with the message.
+
+	We use non-persistent connectoin for TCP so TERMINATE message is useless.
+
+	CHAT message is not divided on end-of-line (Line Feed).
+
+	Not sure what should be done after receiving RELAY message.
+
+	CHAT counter is not shared between the peers, but each peer keeps its own
+	counter starting from 1. Not sure if this is the correct implementatoin.
+
+
+What Works
+
+	Everything else
+
+
+How to Run Code
+
+	1. Create a central serve by $ ./server.py 12121 
+
+		where 12121 is the port number the socket of the central server binds to.
+
+	2. On two different terminals, to create two dfferent clients invoke
+
+		$ ./client.py john 127.0.0.1 12121
+
+		$ ./client.py jane 127.0.0.1 12121
+
+		These clients will run the server logic and client logic in threads.
+		They will prompt for the peer to initiate connection to, but runs the
+		TCP server in the background at the same time. On the terminal of jane
+		showing the prompt for another peer to connect to, typing in john will
+		initiate the connection to john. Then, jane can choose to chat with or
+		download a file from john. If you choose option to download file, it
+		saves file to ** from_john_filename **, where the filename is the file on
+		john's computer.
+
+
+
