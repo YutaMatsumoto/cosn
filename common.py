@@ -11,14 +11,3 @@ def get_open_port():
 	return port
 
 
-def parse_command():
-	if 3 > len( sys.argv ):
-		print "usage : client.py user-id server-ip [server-port]"
-		print "argv: ", sys.argv
-		sys.exit(1)
-	sys.argv.pop(0); 
-	uid   = sys.argv[0] ; sys.argv.pop(0)
-	cs_ip = sys.argv[0] ; sys.argv.pop(0)
-	cs_port = int( sys.argv[0] )
-	print "uid, server ip, server port = ", uid, cs_ip, cs_port
-	return uid, cs_ip, cs_port

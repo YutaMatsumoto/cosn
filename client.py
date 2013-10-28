@@ -34,6 +34,7 @@
 #
 
 	
+from cosn_log import *
 from chatscreen import *
 from functools import wraps
 from profile import *
@@ -72,8 +73,18 @@ class Client(threading.Thread):
 	cs_port = -1 # port number of central server for UDP requests
 	cs_sock = socket(AF_INET, SOCK_DGRAM) # udp socket to connect to server
 
+	def stop(self):
+		self._stop.set()
+
+	def stopped(self):
+		return self._stop.isSet()
+
 	def __init__(self, uid, cs_ip, cs_port, role):
+
+		# super(Client, self).__init__()
 		threading.Thread.__init__(self)
+		self._stop = threading.Event()
+
 		self.cs_ip, self.cs_port = cs_ip, cs_port
 		self.chat_screen = ChatScreen()
 		self.uid = uid
@@ -148,14 +159,16 @@ class Client(threading.Thread):
 	
 	def _send_to_central_server(self, message):
 		if self.debug: 
-			print "To   Central Server: ", message
+			log_msg = self.uid + " sent to CentralServer: " + message
+		ActivityLog.Instance().log(log_msg)	
 		self.cs_sock.sendto( message + "\n" , self.cs_address() )
 
 	def _receive_from_central_server(self):
 		# TODO buffer size
 		(message, address) = self.cs_sock.recvfrom(2048)
 		if (self.debug):
-			print "From Central Server: ", message
+			log_msg = self.uid + " received from CentralServer: " + message
+			ActivityLog.Instance().log(log_msg)
 		return message, address
 
 	# ------------------------------------------------------------------------
@@ -164,7 +177,8 @@ class Client(threading.Thread):
 	def server_receive(self,sock):
 		message = sock.recv(1024) # TODO buffer size
 		if self.debug:
-			print "Received ", message
+			log_msg = self.uid + " received " + message
+		ActivityLog.Instance().log(log_msg)
 		return message
 
 	def serve_tcp_request(self):
@@ -229,16 +243,21 @@ class Client(threading.Thread):
 					break
 				else:
 					message += char
+			log_msg = self.uid + " received " + message
 		elif stop == "1MB":
 			message = sock.recv(1024*1024)
-
-		if self.debug:
-			print "From Peer: ", message
+			log_msg = self.uid + " receiving a file."
+		else:
+			print "In _receive_from_peer(): Bug if this is shown."
+		ActivityLog.Instance().log(log_msg)
+		# if self.debug:
+		# 	print "From Peer: ", message
 		return message 
 
 	def _send_to_peer(self, sock, message):
 		if self.debug:
-			print "To   Peer: ", message
+			log_msg = self.uid + " sent to   Peer: " + message
+		ActivityLog.Instance().log(log_msg)
 		sock.send(message + "\n")
 
 	def init_tcp_conn(self,ip,port): 
@@ -328,7 +347,7 @@ class Client(threading.Thread):
 	def peer_profile(self, version_in_request, sock): 
 		# Create xml file that consists of all the profiles since the version_in_request
 		current_profile_version  = self.profile.current_version_number()
-		profile_update = self.profile.versions_between(int(version_in_request)+1, current_profile_version ).tostring()
+		profile_update = self.profile.versions_between(int(version_in_request), current_profile_version ).tostring()
 		profile_update_length = str( len(profile_update) )
 		message = self.uid + " " + str(current_profile_version) + " " +  str(profile_update_length) + " " + profile_update
 
@@ -349,7 +368,8 @@ class Client(threading.Thread):
 
 			# Receive File
 			reply = self._receive_from_peer(sock, "1MB")
-			file = open("from_"+peer+"_"+os.path.basename(filename), 'wr')
+			filename = "from_"+peer+"_"+os.path.basename(filename)
+			file = open(filename, 'wr')
 
 			# throw away first three words
 			reply = reply.partition(' ')[2]
@@ -357,6 +377,7 @@ class Client(threading.Thread):
 			reply = reply.partition(' ')[2]
 			file.write(reply)
 			file.close()
+			print "file saved to " + filename
 			# print file.read()
 
 	def peer_file(self, filename, sock):
@@ -366,9 +387,13 @@ class Client(threading.Thread):
 			filestr = f.read()
 			filesize= len(filestr)
 			message = "FILE " + filename + " " + str(filesize) + " " + filestr
+			log_msg = self.uid + " sent a file, "+filename
 		else:
 			message = "FILE " + filename + " " + str(0)
-		self._send_to_peer(sock, message)
+			log_msg = self.uid + " cannot send a file since the file, "+filename+" does not exist."
+		ActivityLog.Instance().log(log_msg)
+		sock.send(message)
+		# self._send_to_peer(sock, message)
 
 	def peer_terminate(self):
 		print "well, our program terminates connection for every message..."
@@ -386,6 +411,8 @@ class Client(threading.Thread):
 		# As Client
 		elif self.role == "client":
 			while True:
+				if self.stopped():
+					return
 				# Prompt for peer to connect to and get the ip and port of tcp socket of the peer.
 				while True:
 					peer_uid = raw_input( "Enter who you want to communicate with: " )
@@ -434,11 +461,6 @@ class Client(threading.Thread):
 						print "Please enter 1 or 2."
 
 
-
-
-
-
-
 # ------------------------------------------------------------------------------
 # Test
 
@@ -480,6 +502,30 @@ def tcp_tests():
 	else:
 		print "uid not yuta/ymat nor soari"
 
+# ------------------------------------------------------------------------------
+
+def print_usage():
+	print "usage : client.py user-id server-ip server-port"
+	print "argv: ", sys.argv
+
+
+def parse_command():
+	if 3 >= len( sys.argv ):
+		print_usage()
+		sys.exit(1)
+	sys.argv.pop(0); 
+	uid   = sys.argv[0] ; sys.argv.pop(0)
+	cs_ip = sys.argv[0] ; sys.argv.pop(0)
+	try: 
+		cs_port = int( sys.argv[0] )
+	except ValueError:
+		print_usage()
+		print "port number must number. but <"+sys.argv[0]+"> is given."
+		sys.exit(1)
+		
+	print "uid, server ip, server port = ", uid, cs_ip, cs_port
+	return uid, cs_ip, cs_port
+
 
 # ------------------------------------------------------------------------------
 # Main
@@ -492,7 +538,8 @@ from subprocess import call
 def signal_handler(signal, frame):
 	print "SIGINT received"
 	# TODO
-	call(["kill", "python"])
+	# call(["kill", "python"])
+	client_client.stop()	
 	sys.exit(1)
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -502,12 +549,14 @@ if __name__ == "__main__":
 	uid, cs_ip, cs_port = parse_command()
 	client_client = Client(uid,cs_ip,cs_port, "client")
 	client_server = Client(uid,cs_ip,cs_port, "server")
+	client_client.daemon = True
+	client_server.daemon = True
 	client_client.start()
 	client_server.start()
 
 	# TODO thread join	
-	client_client.join()	
-	client_server.join()
+	# client_client.join()	
+	# client_server.join()
 
 	# Client("")
 

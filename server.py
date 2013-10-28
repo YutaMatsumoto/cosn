@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from cosn_log import *
 import pprint
 import signal
 import sys
@@ -19,15 +20,14 @@ signal.signal(signal.SIGINT, signal_handler)
 
 def parse_command(): 
 	sys.argv.pop(0)
-	for arg in sys.argv: 
-		if 0 < len( sys.argv ):
-			port = int( sys.argv[0] )
-			print "binding port: " + sys.argv[0]
-		else:
-			print "Usage : server.py portnumber "
-			sys.argv.pop(0)
-			sys.exit(1)
-	return port
+	if 0 < len( sys.argv ):
+		port = int( sys.argv[0] )
+		print "binding port: " + sys.argv[0]
+		return port
+	else:
+		print "Usage : server.py portnumber "
+		print "Example : $ ./server.py 12121"
+		return None
 
 # udp server parameters
 def setup_udp_socket(port):
@@ -41,19 +41,19 @@ def setup_udp_socket(port):
 # ------------------------------------------------------------------------------
 # Server Functions
 
+# This prints client table.
 def print_ctable():
 	# TODO pretty print
 	pprint.pprint(ctable)
 
-# TODO : Thread / select ? 
+# SOMEDAY : Thread / select ? 
 def ping(uid,ip,port):
 	print "PINGing " + uid + " " + ip + " " + str(port)
 	message = "PING " + uid + " " + ip + " " + str(port)
 	sock = socket(AF_INET, SOCK_STREAM)
 	sock.connect((ip,int(port)))
 	sock.send(message)
-	# TODO : timeout = 60 seconds
-	sock.settimeout(1)
+	sock.settimeout(60)
 	# TODO : check pong message
 	success = True
 	try: 
@@ -70,22 +70,27 @@ def ping(uid,ip,port):
 # Main
 
 port = parse_command()
-sock_bufsize=2048
+if port is None:
+	sys.exit(1)
+sock_bufsize = 2048
 sock = setup_udp_socket(port)
 ctable = {} # client info variables
 
 # Handle Client Request
 while 1:
 	message, caddr = sock.recvfrom(sock_bufsize)
-	print "From Client of "+str(caddr)+ ": " + message
+	log_msg = "Central Server received from Client of "+str(caddr)+ ": " + message
+	ActivityLog.Instance().log(log_msg)
 	words = message.split()
 	if len(words)<1: 
 		print "wrong client request"
 		sys.exit(2)
 	if words[0] == "REGISTER":
 		if len(words)<4: 
-			print "Number of arguments for REGISTER command is not enough."
-			sys.exit(3)
+			errlog = "Number of arguments for REGISTER command is not enough: " + " ".join(words)
+			ErrorLog.Instance.log(errlog)
+			continue
+			# sys.exit(3)
 		cmuid=words[1]  # client message uid
 		cmaddr=words[2] # client message address
 		cmport=words[3] # client message port
@@ -95,8 +100,9 @@ while 1:
 		sock.sendto(ackmsg,caddr) # This is not received by client
 	elif words[0] == "QUERY": 
 		if len(words)<2:
-			print "Number of arguments for QUERY command is not enough"
-			sys.exit(4)
+			errlog = "Number of arguments for QUERY command is not enough: " + " ".join(words)
+			ErrorLog.Instance.log(errlog)
+			continue
 		uid = words[1]
 		if uid in ctable:
 			address = ctable[uid]['address']
@@ -106,6 +112,10 @@ while 1:
 			port = "0"
 		sock.sendto( "LOCATION " + address + " " + port, caddr)
 	elif words[0] == "QUIT":
+		if len(words) < 3
+			errlog = "Number of arguments for QUIT is not enough: " + ( " ".join(words) )
+			ErrorLog.Instance.log(errlog)
+			continue
 		uid_in_message = words[1]
 		ip_in_message = words[2]
 		ip_source = caddr[0]
@@ -115,6 +125,10 @@ while 1:
 		else:
 			ctable.pop(uid_in_message)
 	elif words[0] == "DOWN":
+		if len(words) < 4
+			errlog = "Number of arguments for DOWN is not enough: " + ( " ".join(words) )
+			ErrorLog.Instance.log(errlog)
+			continue
 		uid = words[1]
 		ip = words[2]
 		port = words[3]
