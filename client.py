@@ -6,7 +6,7 @@
 # This program acts as a client program of COSN specified on
 # <http://www.cse.unr.edu/~mgunes/cpe400/project1.htm>. This client has
 # capability to access the central server to query the information regarding
-# the peers, and initiate communication with other peers, and serve other peers. 
+# the peers, initiate communication with other peers, and serve other peers. 
 #
 # This file consists of Client class and some code to create one client and
 # run that client. Each message defined in the specification earns a method in
@@ -44,37 +44,11 @@ import signal
 import sys
 import threading
 import time
-
-
-# ------------------------------------------------------------------------------
-# Util
-
-def get_open_port():
-	# From [get open TCP port in Python - Stack Overflow](http://stackoverflow.com/questions/2838244/get-open-tcp-port-in-python)
-	import socket
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	s.bind(("",0))
-	s.listen(1)
-	port = s.getsockname()[1]
-	s.close()
-	return port
-
-def parse_command():
-	if 3 > len( sys.argv ):
-		print "usage : client.py user-id server-ip [server-port]"
-		print "argv: ", sys.argv
-		sys.exit(1)
-	sys.argv.pop(0); 
-	uid   = sys.argv[0] ; sys.argv.pop(0)
-	cs_ip = sys.argv[0] ; sys.argv.pop(0)
-	cs_port = int( sys.argv[0] )
-	print "uid, server ip, server port = ", uid, cs_ip, cs_port
-	return uid, cs_ip, cs_port
-
+from common import *
 
 # ------------------------------------------------------------------------------
 # Client
-class Client: 
+class Client(threading.Thread):
 
 	debug = True
 
@@ -98,15 +72,23 @@ class Client:
 	cs_port = -1 # port number of central server for UDP requests
 	cs_sock = socket(AF_INET, SOCK_DGRAM) # udp socket to connect to server
 
-	def __init__(self, uid, cs_ip, cs_port): 
+	def __init__(self, uid, cs_ip, cs_port, role):
+		threading.Thread.__init__(self)
+		self.cs_ip, self.cs_port = cs_ip, cs_port
 		self.chat_screen = ChatScreen()
 		self.uid = uid
-		self.cs_ip, self.cs_port = cs_ip, cs_port
-		self.ps_port = get_open_port()
-		self.ps_sock.bind(('',self.ps_port))
-		self.ps_sock.listen(1)
-		self.udp_register()
-		self.profile = Profile("profile.xml")
+		self.role = role
+		if self.role == "client":
+			1
+		elif self.role == "server":
+			1
+			self.profile = Profile("profile.xml")
+			self.ps_port = get_open_port()
+			self.ps_sock.bind(('',self.ps_port))
+			self.ps_sock.listen(1)
+			self.udp_register()
+		else:
+			print "unknown role: ", self.role
 
 	def terminate(self): 
 			self.ps_sock.close()	
@@ -163,6 +145,7 @@ class Client:
 		return (self.cs_ip, self.cs_port)
 
 	# ------------------------------------------------------------------------
+	
 	def _send_to_central_server(self, message):
 		if self.debug: 
 			print "To   Central Server: ", message
@@ -187,14 +170,12 @@ class Client:
 	def server_send(self,sock,message):
 		sock.send(message)
 		
-	
 	def serve_tcp_request(self):
 		try: 
 			sock,addr = self.ps_sock.accept()
 			sock.settimeout(3) # TODO adjust TIMEOUT
 			message   = self.server_receive(sock)
 			words     = message.split()
-
 
 			if words[0] == "PING": 
 				# TODO check PING parameters
@@ -239,7 +220,7 @@ class Client:
 			print "Timeout in serve_tcp_request()"
 
 	# ------------------------------------------------------------------------
-	# As Peer
+	# As Peer Client
 	
 	def _receive_from_peer(self, sock): 
 		message = sock.recv(1024*1024)
@@ -282,6 +263,8 @@ class Client:
 			except timeout:
 				print self.uid, "failed friend request"
 				self.udp_down(uid,ip,port)
+				confirmation = ""
+			return confirmation
 		
 	def peer_chat(self, peer, message):
 		# TODO : end-of-line => separate chat message
@@ -294,7 +277,7 @@ class Client:
 		self.chat_screen.show_chat_message(message)
 		self.chat_counter += 1
 		self._send_to_peer(sock, "CHAT "+ str(self.chat_counter) + " " + message)
-		self._receive_from_peer(sock)
+		return self._receive_from_peer(sock)
 
 	def peer_request(self, peer, profile_version):
 		# This functio
@@ -317,6 +300,8 @@ class Client:
 			item = ver.find("item")
 			if item is not None:
 				self.posted_files.append(item.text)
+
+		return self.peer_profile, self.posted_files
 
 		# TODO on PHASE2
 		# update local peer profile on hard disk
@@ -355,7 +340,7 @@ class Client:
 			# Wait for server to send the file
 			# TODO : assure all the data is received
 			reply = self._receive_from_peer(sock)
-			file = open("from_"+peer+"_"+filename, 'wr')
+			file = open("from_"+peer+"_"+os.path.basename(filename), 'wr')
 			# throw away first three words
 			reply = reply.partition(' ')[2]
 			reply = reply.partition(' ')[2]
@@ -377,6 +362,71 @@ class Client:
 
 	def peer_terminate(self):
 		print "well, our program terminates connection for every message..."
+
+	# ------------------------------------------------------------------------
+	# Thread
+	def run(self):
+
+		# As Server
+		if self.role == "server":
+			while 1:
+				self.serve_tcp_request()
+			print "client being run as server"
+
+		# As Client
+		elif self.role == "client":
+			while True:
+				# Prompt for peer to connect to and get the ip and port of tcp socket of the peer.
+				while True:
+					peer_uid = raw_input( "Enter who you want to communicate with: " )
+					location = self.udp_query(peer_uid)
+					ip = location.split()[1]
+					port = location.split()[2]
+					if ip == "0.0.0.0" and port == "0":
+						print "The user, "+peer_uid+ ", is not registered on the central server."
+						continue
+					else:
+						break
+				# Prompt for what to do
+				while True:
+					print "What would you like to do?"
+					print "1. Chat"
+					print "2. File Download"
+					option = raw_input( "Please enter number > " )
+
+					# Do CHAT
+					if option == str(1):
+						reply = self.peer_friend(peer_uid)	
+						reply = reply.split()[0] 
+						# reply_peer = reply.split()[1] 
+						if reply == "CONFIRM":
+							while True:	
+								message = raw_input("Enter Message to Send > ")
+								reply = self.peer_chat(peer_uid, message)
+								print reply
+						elif reply == "BUSY":
+							print peer_uid + " is busy."
+							# print reply_peer + " is busy."
+						break
+
+					# Do File Download by REQUEST and GET
+					elif option == str(2):
+						profile, posted_files = self.peer_request(peer_uid,1)	
+						for i in range(0,len(posted_files)):
+							print str(i+1) + ". " + posted_files[i]
+						file_number = raw_input("Enter number for the file to download > ") 
+						index = int(file_number) - 1
+						file_to_get = posted_files[index]
+						self.peer_get(peer_uid, file_to_get)
+						break
+
+					else:
+						print "Please enter 1 or 2."
+
+
+
+
+
 
 
 # ------------------------------------------------------------------------------
@@ -427,10 +477,12 @@ def tcp_tests():
 # profile = Profile( "profile.xml" )
 # print profile.tostring()
 
+from subprocess import call
 # Establish SIGINT handler for C-C quitting on terminal
 def signal_handler(signal, frame):
 	print "SIGINT received"
-	client.terminate()
+	# TODO
+	call(["kill", "python"])
 	sys.exit(1)
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -438,7 +490,16 @@ if __name__ == "__main__":
 
 	# parse information for central server(cs) information on command line
 	uid, cs_ip, cs_port = parse_command()
-	u = Client(uid,cs_ip,cs_port)
+	client_client = Client(uid,cs_ip,cs_port, "client")
+	client_server = Client(uid,cs_ip,cs_port, "server")
+	client_client.start()
+	client_server.start()
+
+	# TODO thread join	
+	client_client.join()	
+	client_server.join()
+
+	# Client("")
 
 	# [Python Programming/Threading - Wikibooks, open books for an open world](http://en.wikibooks.org/wiki/Python_Programming/Threading)
 	# clientclient = 
