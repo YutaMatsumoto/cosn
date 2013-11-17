@@ -1,3 +1,20 @@
 COSN: Cloud-based Online Social Network
 
-Spec : [CPE 400/600 - Project Part 1](http://www.cse.unr.edu/~mgunes/cpe400/project1.htm)
+- - - 
+
+Phase1 Spec : [CPE 400/600 - Project Part 1](http://www.cse.unr.edu/~mgunes/cpe400/project1.htm)
+
+Phase2 Spec : [CPE 400/600 - Project Phase 2](http://www.cse.unr.edu/~mgunes/cpe400/project2.htm)
+
+- - - 
+
+In Phase1, the peers can chat and share files. There is one central server to
+which all the peers are registered. A peer looks up the IP addresses and port
+numbers of welcoming sockets of other peers on the central server, and start
+communicating.
+
+A peer keeps its own content.xml that lists the files to be shared with other
+peers. The files listed in the `<item>` tag in the content.xml are shared and
+can be downloaded by other peers. The path of a shared file must be local
+and relative to the current working directory of the application.
+
