@@ -48,7 +48,6 @@ class PeerWaiter(threading.Thread):
 		port = self.welcome_port
 		return { "ip":ip, "port":port }
 
-
 	def __init__(self, client): 
 
 		threading.Thread.__init__(self)
@@ -62,7 +61,6 @@ class PeerWaiter(threading.Thread):
 		self.welcome_sock.listen(1)
 
 		self.start()
-
 
 	def __del__(self):
 		# TODO : should be shutdown(SHUT_WR) ? close() does not collect resources immediately ?
@@ -96,19 +94,16 @@ class PeerWaiter(threading.Thread):
 					# print "TIMEOUT IN WAITER"
 					1
 
-
 class PeerServer(threading.Thread):
 
 	debug = True
-	debugHeavy = None
-
+	debugHeavy = True
 
 	def setDebug(self, level=1):
 		if level == 1:
 			PeerServer.debug = True
 		elif level >= 2:
 			PeerServer.debugHeavy = True
-
 
 	def __del__(self):
 		# TODO : should be shutdown(SHUT_WR) ? close() does not collect resources immediately ?
@@ -125,8 +120,7 @@ class PeerServer(threading.Thread):
 
 	def __init__(self, sock, client):
 
-		# self.sock = socket(AF_INET,SOCK_STREAM) # TCP welcoming socket to serve peers
-		# self.port = -1
+		# print lock
 		lock.acquire()
 		PeerServer.client = client
 		lock.release()
@@ -138,10 +132,6 @@ class PeerServer(threading.Thread):
 		self.daemon = True
 
 		self.sock = sock
-		# self.port = get_open_port()
-		# self.sock.bind(('',self.port)) # SOMEDAY : port could not be open at this point. If so, retry.
-		# self.sock.listen(1)
-
 		self.start()
 
 	def server_receive(self,sock):
@@ -149,20 +139,24 @@ class PeerServer(threading.Thread):
 		if self.debug:
 			lock.acquire()
 			log_msg = self.client.uid + " received " + message
-			lock.relase()
+			lock.release()
 		ActivityLog.Instance().log(log_msg)
 		return message
 
+	def server_send(self,sock,msg):
+		sock.send(msg+"\n")
+		1
+		
+
 	def serve_tcp_request(self):
 		sock = self.sock
-		print "BEFORE SERVER_RECEIVE"
 		try: 
 			sock.settimeout(10) # TODO adjust TIMEOUT
 			message   = self.server_receive(sock)
 			words     = message.split()
 
-			if self.debugHeavy is True:
-				print "SERVER : ", words
+			# if self.debugHeavy is True:
+			print "SERVER : ", words
 
 			if words[0] == "FRIEND":
 				print "T FRIEND"
@@ -170,29 +164,24 @@ class PeerServer(threading.Thread):
 				peer_uid = words[1]
 				peer_location_link = words[2]
 				
-				# LOCK HERE
 				lock.acquire()
-				print "REgistering friend after friend_request2()"
-				print self.client.uid
+				print "Registering " + peer_uid + " on " + self.client.uid 
 				self.client.register_peer(peer_uid, sock, peer_location_link )
-				# sock.send("CHAT 19 CHATMESSAGETHROUGHRAWSOCKET IN PEERSERVER IN RESPONSE TO FRIEND")
-				# print self.client
-				# print self.client.uid
-				self.client._send_to_peer(sock, "CONFIRM " + self.client.uid )
-				# RELEASE
+				# self.client._send_to_peer(sock, "CONFIRM " + self.client.uid )
+				self.server_send,(sock, "CONFIRM "+self.client.uid)
+				lock.release()
 
-				print "RECEIVED FRIEND ; "
-				print "     Registering User : ", peer_uid
-				print "     socket           : ",  sock
-
-				# TODO clean up
+				#
 				# Get location and content from location
+				#
+				#	TODO create function for this for common usage
 				response = urllib2.urlopen(peer_location_link)
 				location = cosnlocation.CosnLocation.parse( response.read() )
 				content_link = location["content"]
 				content_link = content_link.replace( 'www.dropbox.com', 'dl.dropboxusercontent.com', 1) # TODO dropbox specific not here
 				content_xml = urllib2.urlopen(content_link).read()
 				content = cosncontent.CosnContent.parse(content_xml)
+
 				lock.acquire()
 				self.client.download_from_wall( content, peer_uid )
 				lock.release()

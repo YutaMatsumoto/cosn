@@ -22,7 +22,7 @@ signal.signal(signal.SIGINT, signal_handler)
 
 def test():
 
-	u_email =  "utah.matsumoto@gmail.com"
+	u_email = "utah.matsumoto@gmail.com"
 	u = Peer("utah",u_email, "gooJ4o2j7O")
 	m_email = "maybe_its_hot@msn.com"
 	m = Peer("maybe", m_email )
@@ -33,24 +33,25 @@ def test():
 	u_location = u.friend_request(m_email)
 	m.friend_request2(u_location)
 
+	u.debug_print()
+	m.debug_print()
+
 	# BUGBUF
 	print "================= u's friends"
 	print u.peers
 	print "================= m's friends"
 	print m.peers
 
-	print "HELLO"
-
 	#
 	# Chat
 	#
-	m.peer_chat("utah", "HEY UTAH from Maybe")
 	u.peer_chat("maybe", "Hey maybe from utah")
+	m.peer_chat("utah", "HEY UTAH from Maybe")
 	
 
 
 
-def main(email_address):
+def main(uid,email_address):
 	# # TODO prompt for uid and email address
 	# email_address = "utah.matsumoto@gmail.com"
 	# uid = 'utahutahutah'
@@ -62,24 +63,33 @@ def main(email_address):
 
 if __name__ == "__main__":
 
-	path = sys.argv[1]
-	uid = path
-	print uid
+	if len(sys.argv) == 2:
+		uid = path = sys.argv[1]
+		if path == "utah": 
+			email_address = "utah.matsumoto@gmail.com"
+			main(uid,email_address)
+		elif path == "maybe":
+			email_address = "maybe_its_hot@msn.com"
+			main(uid,email_address)
+		elif path == "saori":
+			email_address = "isono22s@gmail.com"
+			main(uid,email_address)
+		elif path == "bryam":
+			email_address = "soccerbryam@gmail.com"
+			main(uid,email_address)
+		elif path == "jikken":
+			test()
+	elif len(sys.argv) == 3:
+		uid = sys.argv[1] 
+		print "Hello " + uid
+		print "Connecting to cloud to upload current location..."	
+		email_address = sys.argv[2]	
+		main(uid,email_address)
+	else:
+		print "Usage: main.py user-ID gmail-address"	
+		sys.exit(1)
 
-	if path == "utah": 
-		email_address = "utah.matsumoto@gmail.com"
-		main(email_address)
-	elif path == "maybe":
-		email_address = "maybe_its_hot@msn.com"
-		main(email_address)
-	elif path == "saori":
-		email_address = "isono22s@gmail.com"
-		main(email_address)
-	elif path == "bryam":
-		email_address = "soccerbryam@gmail.com"
-		main(email_address)
-	elif path == "jikken":
-		test()
+
 
 	# Run Forever until Control-C
 	while True:

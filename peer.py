@@ -50,6 +50,13 @@ class Peer(threading.Thread):
 
 	
 	# ------------------------------------------------------------------------
+	# Debug
+	def debug_print(self):
+		print "====================Debug"
+		print self.uid
+		print self.server.address()
+	
+	# ------------------------------------------------------------------------
 	# Cloud Facade
 	def upload(self,path):
 		link = self.cloud.upload(path)
@@ -82,12 +89,11 @@ class Peer(threading.Thread):
 							print uid
 						match = False
 						print "=========================="
-						print """Enter the name of the friend you want to chat with and then enter message. If you are done with chatting. Enter done. (You cannot have a friend named done.)"""
-						print ""
+						print "Enter the name of the friend. Enter done when done. "
+						print
 						done_chatting = False
 						counter = 1
 						while True:
-							print counter
 							counter += 1
 							while not match:
 								uid = raw_input("To Whom: ")
@@ -132,7 +138,9 @@ class Peer(threading.Thread):
 					else:
 						print "No file selected. Canceling the upload."
 
+				#
 				# Initiate Friendship : send email with link to locatin.xml
+				#
 				elif option == str(3):
 					peer_email = raw_input( "Enter your friend's email address: " )
 					#
@@ -148,12 +156,14 @@ class Peer(threading.Thread):
 					url_to_location = self.friend_request(peer_email)
 					print "Sent email to " + peer_email
 					print "The location is " + url_to_location
+				#
 				# Confirm Friendship : connect to another peer on the socket shown on locatin.xml
+				#
 				elif option == str(4):
 					url_to_location = raw_input("Enter the link to location of your friend: ")
 					self.friend_request2(url_to_location)
 				else:
-					print "Please enter 1 or 2."
+					print "Please enter a number above."
 				print
 
 	# ------------------------------------------------------------------------
@@ -214,6 +224,7 @@ class Peer(threading.Thread):
 		# port = words[2]
 		# sock = self.init_tcp_conn(ip,port)
 		# self.chat_screen.show_chat_message(message)
+		print "In peer_chat peer = " + peer
 		try:
 			peer = self.peers[ peer ]
 			sock = peer["sock"]
@@ -224,7 +235,6 @@ class Peer(threading.Thread):
 		except KeyError:
 			print "Trying to access " + peer + " but no such user in the list."
 			return ""
-
 
 	def peer_request(self, peer, profile_version):
 		# This functio
@@ -298,9 +308,12 @@ class Peer(threading.Thread):
 
 		# self.register_peer( self.uid, self.server.welcome_sock, self.storage.get_link_to_location()  )
 
-	def register_peer(self, id, sock, location_link):
+	def register_peer(self, uid, sock, location_link):
 		#	sock": tcp connection socket
-		self.peers[id] = { "sock":sock, "location":location_link, "chat_counter":0 }
+		self.peers[uid] = { "sock":sock, "location":location_link, "chat_counter":0 }
+		print "id of self.peers on "+ self.uid
+		print hex(id(self.peers))
+		print "Peer on "+self.uid, self.peers
 
 	# ------------------------------------------------------------------------
 	# friend request2 : make a friend request to the peer 1 who has sent the
@@ -328,7 +341,8 @@ class Peer(threading.Thread):
 		content_link = content_link.replace( 'www.dropbox.com', 'dl.dropboxusercontent.com', 1) # TODO dropbox specific not here
 		content_xml = urllib2.urlopen(content_link).read()
 		content = cosncontent.CosnContent.parse(content_xml)
-		# Download all files referenced in the content file if not exist locally already
+
+		# Download all files referenced in the content file if it does not exist locally already
 		self.download_from_wall(content, location["ID"] )
 
 		# Start TCP connections to the peer for the chat, and 
@@ -337,9 +351,17 @@ class Peer(threading.Thread):
 		ip = location["IP"]
 		port = port = location["port"]
 		sock = self.init_tcp_conn(ip, port)
+
+		print self.uid + "is trying connect to " + ip + " " + str(port)
+
 		location_link = self.storage.get_link_to_location()
-		self._send_to_peer(sock, "FRIEND "+self.uid + " " + location_link) # TODO message
-		self.register_peer(id, sock, location_link)
+
+		message = "FRIEND "+self.uid + " " + location_link
+		self._send_to_peer(sock, message) # TODO message
+		self.register_peer(id, sock, peer_location)
+
+		# Receive Friend Confirmation
+		print self._receive_from_peer(sock)
 
 		# TODO terminate all the connections on SIGINT
 
