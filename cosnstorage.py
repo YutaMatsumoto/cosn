@@ -30,27 +30,28 @@ import xml.etree.ElementTree as ET
 
 class CosnStorage:
 
-	__shared_state = {} # Borg Pattern variable; shared storage for all the instances
+	# __shared_state = {} # Borg Pattern variable; shared storage for all the instances
 	inited = False
 	cloud = None
 
-	def __init__(self,cloud):
-		self.__dict__ = self.__shared_state
+	def __init__(self,cloud,prefix=""):
+		self.prefix = prefix
+		# self.__dict__ = self.__shared_state
 		if CosnStorage.inited is False:
 			CosnStorage.cloud = cloud
 			CosnStorage.inited = True
 
 	def location_fname(self):
-		return "location.xml"
+		return self.prefix+"_location.xml"
 
 	def profile_fname(self):
-		return "publicProfile.xml"
+		return self.prefix+"_publicProfile.xml"
 
 	def content_fname(self):
-		return "content.xml"
+		return self.prefix+"_content.xml"
 			
 	def	publish_location(self):
-		CosnStorage.cloud.upload("location.xml")
+		CosnStorage.cloud.upload(self.location_fname())
 	
 	def create_profile(self):
 		# Create initial profile. This should be used only when the user does
@@ -106,12 +107,12 @@ class CosnStorage:
 			f.write(s)
 			f.close()
 
-	def create_location(self, address):
+	def create_location(self, address, uid):
 		# Create location file with current IP address and port of the TCP
 		# welcoming socket. The existing location file will be overwritten. The
 		# file will be placed on the cwd of the applicaiton.
 
-		location_path = "location.xml" # TODO
+		location_path = self.location_fname()
 		with open(location_path, "w") as loc:
 			s = """<?xml version="1.0" encoding="UTF-8"?>
 <content>
@@ -122,8 +123,8 @@ class CosnStorage:
 		<time>10/23/2013 1:00pm</time>
 	</addres>
 	<links>
-		<public>https://www.dropbox.com/s/3dahjwr8yhpriqf/publicProfile.xml</public>
-		<content>https://www.dropbox.com/s/bjyk4pawkobu9d1/content.xml</content>
+		<public></public>
+		<content></content>
 		<time>10/23/2013 1:10pm</time>
 	</links>
 </content>"""
@@ -145,10 +146,6 @@ class CosnStorage:
 			#
 			loc_addr = locroot.find("addres")
 			loc_id	 = loc_addr.find("ID")
-			uid = ""
-			# TODO use user ID from location.xml if location.xml already exists
-			while uid == "":
-				uid = raw_input("Enter User ID without white space characters (64 characters at max): ")
 			loc_id.text = uid
 
 			#
@@ -165,16 +162,19 @@ class CosnStorage:
 			#
 			# TODO : public profile and content links from cloud provider
 			#
-
 			profile = self.profile_fname()
 			if not self.cloud.fileexists( profile ):
 				self.create_profile()
+			else:
+				self.cloud.download( self.profile_fname() )
 			self.cloud.upload( profile )
 			profile_link = self.cloud.get_link( profile )
 
 			content = self.content_fname()
 			if not self.cloud.fileexists( content ):
 				self.create_content()
+			else:
+				self.cloud.download( self.content_fname() )
 			self.cloud.upload( content )
 			content_link = self.cloud.get_link( content )
 
@@ -192,3 +192,6 @@ class CosnStorage:
 			self.publish_location()
 
 			return location_path
+
+	def get_link_to_location(self):
+		return self.cloud.get_link(self.location_fname())

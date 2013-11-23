@@ -6,12 +6,14 @@ import xml.etree.ElementTree as ET
 
 class CosnContent:
 
-	def __init__(self,content_file):
+	def __init__(self,content_file, content_dict={}):
 		# 
 		# Assume content flie exists
 		#
 		self.root = ET.parse(content_file).getroot()
 		self.filepath = content_file
+
+	
 	
 	def elem_tag_text(self, tagstr, textstr):
 		e = ET.Element(tagstr)
@@ -56,11 +58,46 @@ class CosnContent:
 		e["info"] = raw_input("info about the file              : ")	
 		return e
 
+	@staticmethod 
+	def element_tag_text(e, tagstr):
+		f = e.find(tagstr)
+		if f is None:
+			return ""
+		else:
+			return f.text
+
+	@staticmethod
+	def parse(xmlstr):
+		root = ET.fromstring(xmlstr)
+		entries = root.findall("version")
+		contents = []
+		for e in entries: 
+			id = e.attrib["id"]
+			type = CosnContent.element_tag_text(e, "type")
+			time = CosnContent.element_tag_text(e, "time")
+			info = CosnContent.element_tag_text(e, "info")
+			tag  = CosnContent.element_tag_text(e, "tag")
+			item = CosnContent.element_tag_text(e, "item")
+
+			contents.append( {\
+				"id":id	,
+				"type":type	,
+				"time":time	,
+				"info":info	,
+				"tag":tag	,
+				"item":item	
+			} )
+		return contents
 
 if __name__ == "__main__":
-	content = CosnContent("content.xml")
-	entry = CosnContent.prompt()
-	entry["time"] = "some time"
-	entry["item"] = "http://blabla"
-# {"type":"text for type", "tag":["aiueo"], "item":"http://linktofile", "info":"some info yeah" }
-	content.insert(entry)
+	# From String
+	f = open("content.xml")
+	content = f.read()
+	print CosnContent.parse(content)
+
+	# From File
+	# content = CosnContent("content.xml")
+	# entry = CosnContent.prompt()
+	# entry["time"] = "some time"
+	# entry["item"] = "http://blabla"
+	# content.insert(entry)

@@ -296,13 +296,10 @@ class Client(threading.Thread):
 		
 	def peer_chat(self, peer, message):
 		# TODO : end-of-line => separate chat message
-		# TODO : Show message sent on chat screen
-		location = self.udp_query( peer ) # TODO saori to saved peer
-		words = location.split()
-		ip = words[1]
-		port = words[2]
-		sock = self.init_tcp_conn(ip,port)
-		# self.chat_screen.show_chat_message(message)
+		try: 
+			sock = peers[ peer ]
+		except KeyError:
+			print "Trying to send message to " + peer + " but no such user is registered as your friend" + peer + " but no such user is registered as your friend."
 		self.chat_counter += 1
 		self._send_to_peer(sock, "CHAT "+ str(self.chat_counter) + " " + message)
 		return self._receive_from_peer(sock)
@@ -548,8 +545,11 @@ if __name__ == "__main__":
 
 	# parse information for central server(cs) information on command line
 	uid, cs_ip, cs_port = parse_command()
+
 	client_client = Client(uid,cs_ip,cs_port, "client")
 	client_server = Client(uid,cs_ip,cs_port, "server")
+
+	# Threads will be able to stop if daemonized
 	client_client.daemon = True
 	client_server.daemon = True
 	client_client.start()
@@ -558,13 +558,6 @@ if __name__ == "__main__":
 	while True: 
 		time.sleep(1000000)
 
-
 	# TODO thread join	
 	# client_client.join()	
 	# client_server.join()
-
-	# Client("")
-
-	# [Python Programming/Threading - Wikibooks, open books for an open world](http://en.wikibooks.org/wiki/Python_Programming/Threading)
-	# clientclient = 
-	# clientserver =

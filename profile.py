@@ -15,6 +15,10 @@
 import os
 import xml.etree.ElementTree as ET
 
+class Location:
+	def __init__(self, url):
+		1
+
 class Profile:
 
 	profiles = None # root Element <profile>
