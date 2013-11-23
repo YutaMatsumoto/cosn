@@ -1,74 +1,101 @@
 COSN: Cloud-based Online Social Network : Phase 1
 
+Scheme
 
-
+	Used Dropbox for Cloud
+   	Used GMail for friendship confirmation
 
 Members 
 
 	Bryam Noguera
 	Yuta Matsumoto
 
-
 Files
 
-	chatscreen.py   … To be chat screen class but not used much in this phase
-	client.py       … This contains class called Client to serve other peers and to make request to other peers.
-	common.py       … This file contains code used by both server and client.
-	cosn_log.py     … Logger classes for errors and activities.
-	profile.py      … Profile class parses xml profiles in file and constructs profiles from xml strings.
-	README          … This file
-	server.py       … Code for central server clients make UDP requests to.
-	timeouterror.py … For timeout.
+	README          ... This file
+
+	cosn_log.py     ... Logger classes for errors and activities.
+
+	cosnlocation.py ... Location file code such as parsing and updating location.
+	cosncontent.py  ... Content file code such as parsing and inserting new entry.
+
+	cosndrop.py     ... Dropbox code to store/download files from dropbox cloud.
+	cosnstorage.py  ... Wrapper that defines API for cloud code needed this
+						program, which takes specific cloud code such as cosndrop.py.
+
+	cosnui.py       ... Code related to user interface such as code to prompt for a file path.
+	chatscreen.py   ... Chat screen class but not used much in this phase
+	common.py       ... This file contains code usd by a couple of other modules such as get_open_port().
+
+	main.py         ... main
+
+	peer.py         ... Client code
+	peerserver.py   ... Cerver code
 
 
 What Doesn'T Work / Possible Problems
 
-	Code worked when both server and clients were invoked on 127.0.0.1, but
-	not over network. This could be because of the local network we were
-	working on.  We get this error "error: [Errno 111] Connection refused".
+	The cloud logic does not change IP address and port to 0.0.0.0 and 0 when
+	it is offline. It does not update IP address and port number as it the
+	user device gets a new IP address and a port number.
 
-	We check errors on just the number of arguments on the message, not
-	anything more.
+	Does not store database of users in a file. If the user quit the program,
+	the database is lost. But we keep the database in a dictionary.
 
-	We used terminal instead of GUI, so if the client program receives some
-	message from other peers when it is showing a promt to the user, the
-	prompt becomes mixed up with the message.
+	Logging and error recording are not done for everything.
 
-	We use non-persistent connectoin for TCP so TERMINATE message is useless.
+	Chat is not implemented.
 
-	CHAT message is not divided on end-of-line (Line Feed).
-
-	Not sure what should be done after receiving RELAY message.
-
-	CHAT counter is not shared between the peers, but each peer keeps its own
-	counter starting from 1. Not sure if this is the correct implementatoin.
-
+	This program just upload an identical copy of public profile since we are not sure what to
+	do with this specific file.
 
 What Works
 
-	Everything else
-
+	Everything Else.
 
 How to Run Code
 
-	1. Create a central serve by $ ./server.py 12121 
+	Please have Dropbox account and GMail Account.
 
-		where 12121 is the port number the socket of the central server binds to.
+	This is a terminal application based on **Dropbox** and **Gmail** which
+	has menu user interface which prompts you for number selection.
 
-	2. On two different terminals, to create two dfferent clients invoke
+	This program stops when the user hits Control-C.
 
-		$ ./client.py john 127.0.0.1 12121
+	1.	Invoke the application with the following syntax
 
-		$ ./client.py jane 127.0.0.1 12121
+		$ python main.py user-ID gmail-address
 
-		These clients will run the server logic and client logic in threads.
-		They will prompt for the peer to initiate connection to, but runs the
-		TCP server in the background at the same time. On the terminal of jane
-		showing the prompt for another peer to connect to, typing in john will
-		initiate the connection to john. Then, jane can choose to chat with or
-		download a file from john. If you choose option to download file, it
-		saves file to ** from_john_filename **, where the filename is the file on
-		john's computer.
+		For example, the following command can be used
 
+		$ python main.py yuta utah.matsumoto@gmail.com
 
+		After this the program will prompt you for the verification code you
+		can obtain at Dropbox website (this token will be saved so no prompt
+		the second time around), and automatically create and upload three
+		files : location.xml, content.xml and publicProfile.xml prefixed by
+		the user ID. After this, menu shows the following
+			
+			1. Chat
+			2. File Upload
+			3. Initiate Friendship
+			4. Confirm Friendship
+
+		This program currently does not support chatting, but all the other choices work, 
+
+			"File Upload" 
+				This lets you upload files on the local computer to the
+				cloud and update content.xml automatically. This will prompt
+				for the file information that will be inserted to content.xml.
+
+			"Initiat Friendship" 
+				This will prompts for an Email address and sends an email to
+				a peer with the location.xml. The email is dispatched by GMail
+				server so the user of this program needs a google account. 
+
+			"Confirm Friendship" 
+				This prompts you for the link to location.xml of another peer
+				that you obtain via email. After confirmatoin, all the files
+				referenced in the content.xml of the friend will be downloaded,
+				but the files will be prefixed by the user ID of the friend.
 

@@ -177,7 +177,7 @@ class Peer(threading.Thread):
 				try:
 					char = sock.recv(1)
 				except:
-					print "sock.recv(1) timed out"
+					# print "sock.recv(1) timed out"
 					return ""
 				if char == "\n": 
 					break
@@ -311,9 +311,9 @@ class Peer(threading.Thread):
 	def register_peer(self, uid, sock, location_link):
 		#	sock": tcp connection socket
 		self.peers[uid] = { "sock":sock, "location":location_link, "chat_counter":0 }
-		print "id of self.peers on "+ self.uid
+		# print "id of self.peers on "+ self.uid
 		print hex(id(self.peers))
-		print "Peer on "+self.uid, self.peers
+		# print "Peer on "+self.uid, self.peers
 
 	# ------------------------------------------------------------------------
 	# friend request2 : make a friend request to the peer 1 who has sent the

@@ -82,7 +82,7 @@ if __name__ == "__main__":
 	elif len(sys.argv) == 3:
 		uid = sys.argv[1] 
 		print "Hello " + uid
-		print "Connecting to cloud to upload current location..."	
+		# print "Connecting to cloud to upload current location..."	
 		email_address = sys.argv[2]	
 		main(uid,email_address)
 	else:

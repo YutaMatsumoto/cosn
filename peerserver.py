@@ -156,10 +156,10 @@ class PeerServer(threading.Thread):
 			words     = message.split()
 
 			# if self.debugHeavy is True:
-			print "SERVER : ", words
+			# print "SERVER : ", words
 
 			if words[0] == "FRIEND":
-				print "T FRIEND"
+				# print "T FRIEND"
 				# TODO separate CONFIRM as a function like tcp_pong
 				peer_uid = words[1]
 				peer_location_link = words[2]
@@ -188,7 +188,7 @@ class PeerServer(threading.Thread):
 
 				# print "FRIEND MESSAGE RECEIVED ON SERVER: ", words
 			elif words[0] == "CHAT": 
-				print "T CHAT"
+				# print "T CHAT"
 				# TODO size limitation on message
 				# chat = sock.recv(1024)
 				counter = words[1]
@@ -199,7 +199,7 @@ class PeerServer(threading.Thread):
 				self.client._send_to_peer(sock, "DELIVERED " + str(counter) )
 				lock.release()
 			else:
-				print "T ELSE"
+				# print "T ELSE"
 				print "Received insensible message: ", message
 
 		except timeout:
